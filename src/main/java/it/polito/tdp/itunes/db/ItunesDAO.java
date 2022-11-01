@@ -7,6 +7,9 @@ import java.sql.SQLException;
 import java.util.ArrayList;
 import java.util.LinkedList;
 import java.util.List;
+import java.util.Map;
+
+import it.polito.tdp.itunes.model.Adiacenza;
 import it.polito.tdp.itunes.model.Album;
 import it.polito.tdp.itunes.model.Artist;
 import it.polito.tdp.itunes.model.Genre;
@@ -76,9 +79,8 @@ public class ItunesDAO {
 		return result;
 	}
 	
-	public List<Track> getAllTracks(){
+	public void getAllTracks(Map<Integer, Track> idMap){
 		final String sql = "SELECT * FROM Track";
-		List<Track> result = new ArrayList<Track>();
 		
 		try {
 			Connection conn = DBConnect.getConnection();
@@ -86,9 +88,14 @@ public class ItunesDAO {
 			ResultSet res = st.executeQuery();
 
 			while (res.next()) {
-				result.add(new Track(res.getInt("TrackId"), res.getString("Name"), 
+				
+				if(!idMap.containsKey(res.getInt("TrackId"))) {
+					Track t = new Track(res.getInt("TrackId"), res.getString("Name"), 
 						res.getString("Composer"), res.getInt("Milliseconds"), 
-						res.getInt("Bytes"),res.getDouble("UnitPrice")));
+						res.getInt("Bytes"),res.getDouble("UnitPrice"));
+					idMap.put(t.getTrackId(), t);
+				}
+				 
 			
 			}
 			conn.close();
@@ -96,7 +103,6 @@ public class ItunesDAO {
 			e.printStackTrace();
 			throw new RuntimeException("SQL Error");
 		}
-		return result;
 	}
 	
 	public List<Genre> getAllGenres(){
@@ -139,6 +145,54 @@ public class ItunesDAO {
 		return result;
 	}
 
+	public List<Track> getVertici(int codGenere, Map<Integer, Track> idMap){
+		final String sql = "SELECT TrackId FROM track WHERE GenreId = ?";
+		List<Track> result = new LinkedList<>();
+		
+		try {
+			Connection conn = DBConnect.getConnection();
+			PreparedStatement st = conn.prepareStatement(sql);
+			st.setInt(1, codGenere);
+			ResultSet res = st.executeQuery();
+
+			while (res.next()) {
+				Track track = idMap.get(res.getInt("TrackId"));
+				result.add(track);
+			}
+			conn.close();
+		} catch (SQLException e) {
+			e.printStackTrace();
+			throw new RuntimeException("SQL Error");
+		}
+		return result;
+	}
 	
-	
+	public List<Adiacenza> getArchi(int codGenere, Map<Integer, Track> idMap){
+		final String sql = "SELECT t1.TrackId, t2.TrackId, ABS(t1.milliseconds - t2.milliseconds) AS delta "
+				+ "FROM track t1, track t2 "
+				+ "WHERE t1.trackId > t2.TrackId "
+				+ "AND t1.MediaTypeId = t2.MediaTypeId "
+				+ "AND t1.GenreId = ? AND t1.GenreId = t2.GenreId";
+		List<Adiacenza> result = new LinkedList<>();
+		
+		try {
+			Connection conn = DBConnect.getConnection();
+			PreparedStatement st = conn.prepareStatement(sql);
+			st.setInt(1, codGenere);
+			ResultSet res = st.executeQuery();
+
+			while (res.next()) {
+				Track t1 = idMap.get(res.getInt("t1.TrackId"));
+				Track t2 = idMap.get(res.getInt("t2.TrackId"));
+				Adiacenza adiacenza = new Adiacenza(t1, t2, res.getInt("delta"));
+				
+				result.add(adiacenza);
+			}
+			conn.close();
+		} catch (SQLException e) {
+			e.printStackTrace();
+			throw new RuntimeException("SQL Error");
+		}
+		return result;
+	}
 }
